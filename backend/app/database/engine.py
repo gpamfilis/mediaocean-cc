@@ -3,7 +3,6 @@ import os
 
 from sqlalchemy.engine import create_engine
 from sqlalchemy.engine.base import Engine
-
 from sqlalchemy.orm import sessionmaker
 
 from app.database.models import Base
