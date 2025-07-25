@@ -8,6 +8,95 @@ from app.database.models import Post, User
 logger = logging.getLogger(__name__)
 
 
+def anomaly_post_title_too_short(character_limit, session):
+    anomalies = []
+    # Get all posts for character limit check
+    all_posts = session.query(Post).all()
+
+    # Check for titles with less than character limit
+    for post in all_posts:
+        if len(post.title) < character_limit:
+            anomalies.append(
+                {
+                    "user_id": post.user_id,
+                    "flag_reason": "Title too short",
+                    "post_title": post.title,
+                    "post_id": post.id,
+                    "user": UserSchema().dump(post.user),
+                    "post": PostSchema(exclude=("user",)).dump(post),
+                    "note": f"User post title {post.title} less than character limit: {character_limit}"
+                }
+            )
+    return anomalies
+
+
+def anomaly_duplicate_titles(session):
+    anomalies = []
+    for user in session.query(User).all():
+        seen_titles = set()
+        dup_titles = set()
+
+        # First pass: find which titles occur more than once
+        for post in user.posts.all():
+            if post.title in seen_titles:
+                dup_titles.add(post.title)
+            else:
+                seen_titles.add(post.title)
+        for post in user.posts.all():
+            if post.title in dup_titles:
+                anomalies.append(
+                    {
+                        "user_id": user.id,
+                        "flag_reason": "Duplicate Post",
+                        "post_title": post.title,
+                        "post_id": post.id,
+                        "note": "User has duplicate title for their post."
+                    }
+                )
+    return anomalies
+
+
+def anomaly_similar_user_titles(similarity_threshold, min_posts, session):
+    all_posts = [
+        (post.id, post.title.lower(), post.user_id)
+        for user in session.query(User).all()
+        for post in user.posts
+    ]
+
+    flagged_posts_per_user = {}
+    anomalies = []
+
+    for i, (id1, title1, user1) in enumerate(all_posts):
+        for id2, title2, user2 in all_posts[i + 1 :]:
+            if user1 == user2:
+                continue
+
+            if fuzz.ratio(title1, title2) < similarity_threshold:
+                continue
+
+            for user_id, post_id, title in [(user1, id1, title1), (user2, id2, title2)]:
+                if user_id not in flagged_posts_per_user:
+                    flagged_posts_per_user[user_id] = set()
+
+                if post_id not in flagged_posts_per_user[user_id]:
+                    flagged_posts_per_user[user_id].add(post_id)
+                    anomalies.append(
+                        {
+                            "user_id": user_id,
+                            "flag_reason": "Similar Post",
+                            "post_title": title,
+                            "post_id": post_id,
+                            "note": f"user {user_id} has {min_posts}+ posts with titles similar to other users (≥ {similarity_threshold}% match)",
+                        }
+                    )
+
+    return [
+        a
+        for a in anomalies
+        if len(flagged_posts_per_user.get(a["user_id"])) >= min_posts
+    ]
+
+
 def get_anomaly_objects(
     session,
     similarity_threshold=50,
@@ -23,83 +112,28 @@ def get_anomaly_objects(
     logger.info("running:get_anomaly_objects")
     anomalies = []
 
-    # Get all posts for character limit check
-    all_posts = session.query(Post).all()
+    anomalies.extend(
+        anomaly_post_title_too_short(character_limit=character_limit, session=session)
+    )
 
-    # Check for titles with less than character limit
-    for post in all_posts:
-        if len(post.title) < character_limit:
-            anomalies.append(
-                {
-                    "user_id": post.user_id,
-                    "flag_reason": "Title too short",
-                    "post_title": post.title,
-                    "post_id": post.id,
-                    "user": UserSchema().dump(post.user),
-                    "post": PostSchema(exclude=("user",)).dump(post),
-                }
-            )
+    anomalies.extend(
+        anomaly_similar_user_titles(similarity_threshold, min_posts, session)
+    )
 
-    # Check for similar posts by user
-    for user in session.query(User).all():
-        user_posts = user.posts.all()
+    anomalies.extend(anomaly_duplicate_titles(session))
 
-        if len(user_posts) < min_posts:
-            continue
+    # unique = []
+    # seen = set()
 
-        # Check for similar titles within user's posts
-        for i, post1 in enumerate(user_posts):
-            for post2 in user_posts[i + 1 :]:
-                similarity_score = fuzz.ratio(post1.title.lower(), post2.title.lower())
-
-                if similarity_score >= similarity_threshold:
-                    # Add both posts as anomalies
-                    anomalies.append(
-                        {
-                            "user_id": user.id,
-                            "flag_reason": "Similar Post",
-                            "post_title": post1.title,
-                            "post_id": post1.id,
-                        }
-                    )
-
-    # Duplicate Titles.
-    for user in session.query(User).all():
-        seen_titles = set()
-        dup_titles = set()
-
-        # First pass: find which titles occur more than once
-        for post in user.posts.all():
-            if post.title in seen_titles:
-                dup_titles.add(post.title)
-            else:
-                seen_titles.add(post.title)
-
-        # Second pass: record each post whose title was duplicated
-        for post in user.posts.all():
-            if post.title in dup_titles:
-                anomalies.append(
-                    {
-                        "user_id": user.id,
-                        "flag_reason": "Duplicate Post",
-                        "post_title": post.title,
-                        "post_id": post.id,
-                    }
-                )
-
-    unique = []
-    seen = set()
-
-    for entry in anomalies:
-        # define what makes an entry “duplicate”
-        key = (entry["user_id"], entry["post_id"], entry["flag_reason"])
-        if key not in seen:
-            seen.add(key)
-            unique.append(entry)
+    # for entry in anomalies:
+    #     key = (entry["user_id"], entry["post_id"], entry["flag_reason"])
+    #     if key not in seen:
+    #         seen.add(key)
+    #         unique.append(entry)
 
     if sort_order == "asc":
         sort_order = False
     else:
         sort_order = True
 
-    return sorted(unique, key=lambda x: x[sort_by], reverse=sort_order)
+    return sorted(anomalies, key=lambda x: x[sort_by], reverse=sort_order)

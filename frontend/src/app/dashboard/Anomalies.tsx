@@ -254,6 +254,9 @@ const AnomaliesTable = ({ params }) => {
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
+                  <Typography>Note</Typography>
+                </TableCell>
+                <TableCell>
                   <TableSortLabel
                     active={sortBy === "flag_reason"}
                     direction={sortBy === "flag_reason" ? sortOrder : "asc"}
@@ -283,18 +286,10 @@ const AnomaliesTable = ({ params }) => {
                     />
                   </TableCell>
                   <TableCell>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        maxWidth: 300,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                      title={item.post_title}
-                    >
-                      {item.post_title}
-                    </Typography>
+                    <Typography variant="body2">{item.post_title}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography>{item.note}</Typography>
                   </TableCell>
                   <TableCell>
                     <Chip
