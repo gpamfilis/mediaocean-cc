@@ -1,4 +1,16 @@
-# Visit http://167.172.181.29:3000 to view in cloud
+# Ad Insight Exporer Lite
+
+The ultimate tool for fraud detection (and this is just the light version...)
+
+### Visit http://167.172.181.29:3000 to view in cloud
+
+
+
+## how it works
+
+The service fetches from your posts api in this case jsonplaceholder and computes summaries and anomalies based on user behavious and post characteristcs.
+
+
 
 # To run locally
 
