@@ -1,0 +1,60 @@
+# MY IGNORES
+sqlalchemy_engine.log
+*.mp3
+*.wav
+*.bin
+.vscode
+*.vsix
+*.txt
+*.csv
+# Ignore all temp.md files in the project
+backend/notebooks/data
+# Existing entries in your .gitignore file
+
+# Ignore all .ipynb_checkpoints directories
+**/.ipynb_checkpoints
+**/temp.md
+# CELERY
+celerybeat-schedule
+temp
+# PYTHON
+.mypy_cache
+.venv
+.env
+local.env
+**/__pycache__/
+**.db
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
